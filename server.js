@@ -57,7 +57,7 @@ const upload = multer({
 
 // Supabase configuration
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const geminiApiKey = process.env.GEMINI_API_KEY || "";
 const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
@@ -729,18 +729,33 @@ app.post('/api/student/extract-skills', authMiddleware, requireStudentRole, asyn
 
     const arrayBuffer = await data.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const pdfData = await pdfParse(buffer);
-    const text = pdfData.text;
+    
+    let promptText = "Extract a concise list of professional and technical skills from this resume document. Return ONLY a JSON array of strings, nothing else. Do not include markdown formatting like ```json.";
+    let contents = [];
 
-    if (!text || text.trim().length === 0) {
-      return res.status(400).json({ error: 'Could not extract text from the PDF' });
+    const lowerUrl = resumeUrl.toLowerCase();
+    const isImage = lowerUrl.match(/\.(png|jpe?g|webp)$/);
+
+    if (isImage) {
+        const ext = lowerUrl.split('.').pop();
+        let mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+        contents = [
+            { text: promptText },
+            { inlineData: { data: buffer.toString('base64'), mimeType } }
+        ];
+    } else {
+        const pdfData = await pdfParse(buffer);
+        const text = pdfData.text;
+
+        if (!text || text.trim().length === 0) {
+            return res.status(400).json({ error: 'Could not extract text from the PDF' });
+        }
+        contents = `${promptText} Resume text: ${text.substring(0, 5000)}`;
     }
-
-    const prompt = `Extract a concise list of professional and technical skills from the following resume text. Return ONLY a JSON array of strings, nothing else. Do not include markdown formatting like \`\`\`json. Resume text: ${text.substring(0, 5000)}`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: prompt,
+        contents: contents,
     });
     
     let rawText = response.text;

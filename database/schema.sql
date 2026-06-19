@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS public.student_profiles (
     avatar_url TEXT,
     certificate_url TEXT,
     bio TEXT,
+    projects JSONB DEFAULT '[]'::jsonb NOT NULL,
     blocked BOOLEAN DEFAULT false NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -49,7 +50,8 @@ CREATE TABLE IF NOT EXISTS public.student_profiles (
 ALTER TABLE public.student_profiles
     ADD COLUMN IF NOT EXISTS github_url TEXT,
     ADD COLUMN IF NOT EXISTS linkedin_url TEXT,
-    ADD COLUMN IF NOT EXISTS project_url TEXT;
+    ADD COLUMN IF NOT EXISTS project_url TEXT,
+    ADD COLUMN IF NOT EXISTS projects JSONB DEFAULT '[]'::jsonb NOT NULL;
 
 -- 4. Create Companies Table
 CREATE TABLE IF NOT EXISTS public.companies (
