@@ -5,6 +5,9 @@ const multer = require('multer');
 const ws = require('ws');
 globalThis.WebSocket = ws;
 
+const pdfParse = require('pdf-parse');
+const { GoogleGenAI } = require('@google/genai');
+
 const { createClient } = require("@supabase/supabase-js");
 
 // Load environment variables from current directory
@@ -56,6 +59,8 @@ const upload = multer({
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const geminiApiKey = process.env.GEMINI_API_KEY || "";
+const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
   console.error(
@@ -697,6 +702,117 @@ app.post('/api/student/applications', authMiddleware, requireStudentRole, async 
   } catch (err) {
     console.error('Submit application error:', err);
     return res.status(500).json({ error: err.message || 'Failed to submit application' });
+  }
+});
+
+// AI Resume Skill Extraction
+app.post('/api/student/extract-skills', authMiddleware, requireStudentRole, async (req, res) => {
+  try {
+    const { resumeUrl } = req.body;
+    if (!resumeUrl) {
+      return res.status(400).json({ error: 'resumeUrl is required' });
+    }
+
+    if (!ai) {
+      return res.status(500).json({ error: 'Gemini API key is not configured' });
+    }
+
+    const adminClient = getAdminClient();
+    const { data, error } = await adminClient.storage
+      .from('resumes')
+      .download(resumeUrl);
+
+    if (error || !data) {
+      console.error("Storage download error:", error);
+      return res.status(404).json({ error: 'Could not download resume from storage' });
+    }
+
+    const arrayBuffer = await data.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const pdfData = await pdfParse(buffer);
+    const text = pdfData.text;
+
+    if (!text || text.trim().length === 0) {
+      return res.status(400).json({ error: 'Could not extract text from the PDF' });
+    }
+
+    const prompt = `Extract a concise list of professional and technical skills from the following resume text. Return ONLY a JSON array of strings, nothing else. Do not include markdown formatting like \`\`\`json. Resume text: ${text.substring(0, 5000)}`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+    });
+    
+    let rawText = response.text;
+    rawText = rawText.replace(/```json/gi, '').replace(/```/gi, '').trim();
+    const skills = JSON.parse(rawText);
+
+    res.json({ skills });
+  } catch (err) {
+    console.error('Skill extraction error:', err);
+    res.status(500).json({ error: 'Failed to extract skills' });
+  }
+});
+
+// AI Opportunity Recommendations
+app.get('/api/student/recommendations', authMiddleware, requireStudentRole, async (req, res) => {
+  try {
+    const adminClient = getAdminClient();
+    
+    // Fetch student profile to get their skills
+    const { data: profile } = await adminClient
+      .from('student_profiles')
+      .select('skills, course, year_of_study')
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (!profile) {
+      return res.status(404).json({ error: 'Student profile not found' });
+    }
+
+    // Fetch active job posts
+    const { data: jobs } = await adminClient
+      .from('job_posts')
+      .select('*, companies(name, logo_url)')
+      .eq('active', true);
+
+    if (!jobs || jobs.length === 0) {
+      return res.json({ recommendations: [] });
+    }
+
+    const studentSkills = profile.skills || [];
+    const studentCourse = profile.course || '';
+
+    // Calculate match score logic (Simple keyword based for fast response)
+    const scoredJobs = jobs.map(job => {
+      let score = 0;
+      const requiredSkills = job.required_skills || [];
+      
+      if (requiredSkills.length === 0) {
+        score = 50; // default medium score if no skills specified
+      } else {
+        const matches = requiredSkills.filter(skill => 
+          studentSkills.some(s => s.toLowerCase().includes(skill.toLowerCase())) ||
+          skill.toLowerCase().includes(studentCourse.toLowerCase())
+        );
+        score = Math.round((matches.length / requiredSkills.length) * 100);
+      }
+
+      // Add a slight boost if the job title or description mentions their course
+      if (studentCourse && (job.title.toLowerCase().includes(studentCourse.toLowerCase()) || job.description.toLowerCase().includes(studentCourse.toLowerCase()))) {
+        score = Math.min(100, score + 15);
+      }
+
+      return { ...job, matchScore: score };
+    });
+
+    // Sort by match score descending
+    scoredJobs.sort((a, b) => b.matchScore - a.matchScore);
+
+    res.json({ recommendations: scoredJobs });
+  } catch (err) {
+    console.error('Recommendations error:', err);
+    res.status(500).json({ error: 'Failed to fetch recommendations' });
   }
 });
 

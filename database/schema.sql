@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS public.student_profiles (
     achievements TEXT,
     extracurriculars TEXT,
     github_url TEXT,
-    portfolio_url TEXT,
+    linkedin_url TEXT,
     project_url TEXT,
     resume_url TEXT,
     avatar_url TEXT,
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS public.student_profiles (
 
 ALTER TABLE public.student_profiles
     ADD COLUMN IF NOT EXISTS github_url TEXT,
-    ADD COLUMN IF NOT EXISTS portfolio_url TEXT,
+    ADD COLUMN IF NOT EXISTS linkedin_url TEXT,
     ADD COLUMN IF NOT EXISTS project_url TEXT;
 
 -- 4. Create Companies Table
