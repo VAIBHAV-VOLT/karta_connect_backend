@@ -25,6 +25,19 @@ jobs:
             cd ~/karta_connect_backend
             git pull origin main
 
+            # Create .env file with GitHub Secrets and Variables
+            cat > .env << 'ENVEOF'
+            PORT=${{ vars.PORT }}
+            NODE_ENV=production
+            VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL }}
+            VITE_SUPABASE_PROJECT_ID=${{ vars.VITE_SUPABASE_PROJECT_ID }}
+            VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+            SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+            FRONTEND_URL=${{ vars.FRONTEND_URL }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            ENVEOF
+
             docker stop karta-backend || true
             docker rm karta-backend || true
 
@@ -33,4 +46,5 @@ jobs:
             docker run -d \
               -p 5000:5000 \
               --name karta-backend \
+              --env-file .env \
               karta-backend
