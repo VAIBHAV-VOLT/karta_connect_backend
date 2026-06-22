@@ -1,15 +1,13 @@
-FROM node:20-alpine
+FROM node:22-alpine
+
 WORKDIR /app
 
-# Install only production dependencies by default
 COPY package*.json ./
-RUN npm ci --only=production
 
-# Copy app source
+RUN npm install
+
 COPY . .
 
-# Ensure uploads directory exists
-RUN mkdir -p uploads/resumes
-
 EXPOSE 3001
-CMD ["node", "server.js"]
+
+CMD ["npm","start"]
