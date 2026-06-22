@@ -1,14 +1,36 @@
-name: Docker Image CI
+name: Deploy To EC2
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
-  test:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Deploy
+        uses: appleboy/ssh-action@v1.0.3
 
-      - run: echo "Pipeline working"
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+          script: |
+            cd ~/karta_connect_backend
+            git pull origin main
+
+            docker stop karta-backend || true
+            docker rm karta-backend || true
+
+            docker build -t karta-backend .
+
+            docker run -d \
+              -p 5000:5000 \
+              --name karta-backend \
+              karta-backend
