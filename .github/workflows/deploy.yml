@@ -1,7 +1,7 @@
 name: Deploy To EC2
 
 on:
-  pull_request:
+  push:
     branches:
       - main
 
@@ -21,7 +21,7 @@ jobs:
           script: |
             cd ~/karta_connect_backend
             git pull origin main
-
+            
             # Create .env file with GitHub Secrets and Variables
             cat > .env << 'ENVEOF'
             PORT=${{ vars.PORT }}
