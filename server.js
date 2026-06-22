@@ -705,6 +705,56 @@ app.post('/api/student/applications', authMiddleware, requireStudentRole, async 
   }
 });
 
+// --- Moderation Issues ---
+
+// Admin: Fetch all moderation issues
+app.get("/api/admin/moderation-issues", authMiddleware, requireAdminRole, async (req, res) => {
+  try {
+    const adminClient = getAdminClient();
+    const { data, error } = await adminClient
+      .from('moderation_issues')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return res.json(data);
+  } catch (err) {
+    console.error("Fetch moderation issues error:", err);
+    return res.status(500).json({ error: "Failed to fetch moderation issues" });
+  }
+});
+
+// Admin: Update moderation issue status
+app.patch("/api/admin/moderation-issues/:id", authMiddleware, requireAdminRole, async (req, res) => {
+  const { id } = req.params;
+  const { status, admin_notes } = req.body;
+
+  try {
+    const adminClient = getAdminClient();
+
+    const updateData = {};
+    if (status) updateData.status = status;
+    if (admin_notes !== undefined) updateData.admin_notes = admin_notes;
+
+    if (status === 'resolved') {
+      updateData.resolved_at = new Date().toISOString();
+    }
+
+    const { data, error } = await adminClient
+      .from('moderation_issues')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
+    return res.json(data);
+  } catch (err) {
+    console.error("Update moderation issue error:", err);
+    return res.status(500).json({ error: "Failed to update moderation issue" });
+  }
+});
+
 // AI Resume Skill Extraction
 app.post('/api/student/extract-skills', authMiddleware, requireStudentRole, async (req, res) => {
   try {
