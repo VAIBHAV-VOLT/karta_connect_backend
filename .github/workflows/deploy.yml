@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or tag to deploy'
+        required: true
+        default: 'main'
 
 jobs:
   deploy:
@@ -19,8 +28,12 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
 
           script: |
+            REF=${{ github.event.inputs.ref }}
             cd ~/karta_connect_backend
-            git pull origin main
+            git fetch origin
+            # try checkout the requested ref, fall back to creating a tracking branch
+            git checkout "$REF" || git checkout -b "$REF" "origin/$REF"
+            git pull origin "$REF"
             
             # Create .env file with GitHub Secrets and Variables
             cat > .env << 'ENVEOF'
