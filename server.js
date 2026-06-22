@@ -14,7 +14,7 @@ const { createClient } = require("@supabase/supabase-js");
 require("dotenv").config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5000;
 
 // Configure CORS to allow access from the frontend
 // Get frontend URL from environment variable, default to localhost
