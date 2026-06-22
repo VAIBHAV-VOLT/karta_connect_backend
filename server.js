@@ -1,8 +1,8 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const multer = require('multer');
-const ws = require('ws');
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const multer = require("multer");
+const ws = require("ws");
 globalThis.WebSocket = ws;
 
 const { createClient } = require("@supabase/supabase-js");
@@ -24,23 +24,23 @@ app.use(
 );
 
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+app.use("/uploads", express.static("uploads"));
 
 // Configure multer for resume uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/resumes');
+    cb(null, "uploads/resumes");
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
+    cb(null, Date.now() + "-" + file.originalname);
+  },
 });
 
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype === 'application/pdf') {
+  if (file.mimetype === "application/pdf") {
     cb(null, true);
   } else {
-    cb(new Error('Only PDF files are allowed'), false);
+    cb(new Error("Only PDF files are allowed"), false);
   }
 };
 
@@ -48,8 +48,8 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB
-  }
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
 });
 
 // Supabase configuration
@@ -76,60 +76,65 @@ function getAdminClient() {
 async function authMiddleware(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res
+        .status(401)
+        .json({ error: "Missing or invalid authorization header" });
     }
 
     const token = authHeader.substring(7);
-    
+
     // Create a client with the user's token to verify it
     const client = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
+      auth: { persistSession: false },
     });
 
     // Set the session with the token
-    const { data: { user }, error: userError } = await client.auth.getUser(token);
-    
+    const {
+      data: { user },
+      error: userError,
+    } = await client.auth.getUser(token);
+
     if (userError || !user) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
+      return res.status(401).json({ error: "Invalid or expired token" });
     }
 
     // Fetch user's role
     const { data: roleData } = await client
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
       .maybeSingle();
 
     req.user = user;
     req.role = roleData?.role || null;
     next();
   } catch (err) {
-    console.error('Auth middleware error:', err);
-    return res.status(401).json({ error: 'Authentication failed' });
+    console.error("Auth middleware error:", err);
+    return res.status(401).json({ error: "Authentication failed" });
   }
 }
 
 // Middleware to require admin role
 function requireAdminRole(req, res, next) {
-  if (req.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
+  if (req.role !== "admin") {
+    return res.status(403).json({ error: "Admin access required" });
   }
   next();
 }
 
 // Middleware to require company role
 function requireCompanyRole(req, res, next) {
-  if (req.role !== 'company') {
-    return res.status(403).json({ error: 'Company access required' });
+  if (req.role !== "company") {
+    return res.status(403).json({ error: "Company access required" });
   }
   next();
 }
 
 // Middleware to require student role
 function requireStudentRole(req, res, next) {
-  if (req.role !== 'student') {
-    return res.status(403).json({ error: 'Student access required' });
+  if (req.role !== "student") {
+    return res.status(403).json({ error: "Student access required" });
   }
   next();
 }
@@ -264,16 +269,18 @@ app.post("/api/auth/signup", async (req, res) => {
       });
 
     if (signUpError || !authData.user) {
-      throw new Error(signUpError ? signUpError.message : "Failed to create auth user.");
+      throw new Error(
+        signUpError ? signUpError.message : "Failed to create auth user.",
+      );
     }
 
     const newUserId = authData.user.id;
     const newUserClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
+      auth: { persistSession: false },
     });
 
     // Assign role
-    const { error: roleError } = await newUserClient.from('user_roles').insert({
+    const { error: roleError } = await adminClient.from("user_roles").insert({
       user_id: newUserId,
       role: role,
     });
@@ -283,30 +290,34 @@ app.post("/api/auth/signup", async (req, res) => {
     }
 
     // Save profile details
-    if (role === 'student' && whitelistRow) {
-      const { error: profileError } = await newUserClient.from('student_profiles').insert({
-        user_id: newUserId,
-        name: whitelistRow.name || '',
-        email: cleanEmail,
-        location: whitelistRow.place || '',
-        university: whitelistRow.university || '',
-        course: whitelistRow.course || '',
-        year_of_study: whitelistRow.year_of_study || '1st Year',
-        graduation_year: whitelistRow.graduation_year || '',
-        skills: [],
-        blocked: false
-      });
+    if (role === "student" && whitelistRow) {
+      const { error: profileError } = await adminClient
+        .from("student_profiles")
+        .insert({
+          user_id: newUserId,
+          name: whitelistRow.name || "",
+          email: cleanEmail,
+          location: whitelistRow.place || "",
+          university: whitelistRow.university || "",
+          course: whitelistRow.course || "",
+          year_of_study: whitelistRow.year_of_study || "1st Year",
+          graduation_year: whitelistRow.graduation_year || "",
+          skills: [],
+          blocked: false,
+        });
 
       if (profileError) {
-        throw new Error(`Failed to create student profile: ${profileError.message}`);
+        throw new Error(
+          `Failed to create student profile: ${profileError.message}`,
+        );
       }
 
       // Update whitelist
       await adminClient
         .from("student_whitelist")
         .update({ used: true })
-        .eq('id', whitelistRow.id);
-    } else if (role === 'company' && companyRow) {
+        .eq("id", whitelistRow.id);
+    } else if (role === "company" && companyRow) {
       // Update company link
       const { error: companyLinkError } = await adminClient
         .from("companies")
@@ -314,7 +325,9 @@ app.post("/api/auth/signup", async (req, res) => {
         .eq("id", companyRow.id);
 
       if (companyLinkError) {
-        throw new Error(`Failed to link company profile: ${companyLinkError.message}`);
+        throw new Error(
+          `Failed to link company profile: ${companyLinkError.message}`,
+        );
       }
     }
 
@@ -328,11 +341,13 @@ app.post("/api/auth/signup", async (req, res) => {
 });
 
 // 3. Delete Own Account Route
-app.post('/api/account/delete', authMiddleware, async (req, res) => {
+app.post("/api/account/delete", authMiddleware, async (req, res) => {
   const { userId } = req.body;
-  
+
   if (userId !== req.user.id) {
-    return res.status(403).json({ error: 'You can only delete your own account.' });
+    return res
+      .status(403)
+      .json({ error: "You can only delete your own account." });
   }
 
   if (!userId) {
@@ -363,56 +378,61 @@ app.post('/api/account/delete', authMiddleware, async (req, res) => {
 });
 
 // 4. Admin Delete Student Route
-app.post('/api/admin/delete-student', authMiddleware, requireAdminRole, async (req, res) => {
-  const { userId, email } = req.body;
-  if (!userId || !email) {
-    return res
-      .status(400)
-      .json({ error: "User ID and email parameters are required." });
-  }
+app.post(
+  "/api/admin/delete-student",
+  authMiddleware,
+  requireAdminRole,
+  async (req, res) => {
+    const { userId, email } = req.body;
+    if (!userId || !email) {
+      return res
+        .status(400)
+        .json({ error: "User ID and email parameters are required." });
+    }
 
-  try {
-    const adminClient = getAdminClient();
+    try {
+      const adminClient = getAdminClient();
 
-    await adminClient.from("applications").delete().eq("student_id", userId);
-    await adminClient.from("student_profiles").delete().eq("user_id", userId);
-    await adminClient
-      .from("student_whitelist")
-      .delete()
-      .eq("email", email.toLowerCase().trim());
-    await adminClient.from("user_roles").delete().eq("user_id", userId);
+      await adminClient.from("applications").delete().eq("student_id", userId);
+      await adminClient.from("student_profiles").delete().eq("user_id", userId);
+      await adminClient
+        .from("student_whitelist")
+        .delete()
+        .eq("email", email.toLowerCase().trim());
+      await adminClient.from("user_roles").delete().eq("user_id", userId);
 
-    const { error: deleteError } =
-      await adminClient.auth.admin.deleteUser(userId);
-    if (deleteError) throw deleteError;
+      const { error: deleteError } =
+        await adminClient.auth.admin.deleteUser(userId);
+      if (deleteError) throw deleteError;
 
-    return res.json({ success: true });
-  } catch (err) {
-    console.error("Admin delete student error:", err);
-    return res
-      .status(500)
-      .json({ error: err.message || "Failed to delete student." });
-  }
-});
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("Admin delete student error:", err);
+      return res
+        .status(500)
+        .json({ error: err.message || "Failed to delete student." });
+    }
+  },
+);
 
 // 5. Admin Bulk Upload Route
-app.post('/api/admin/bulk-upload-whitelist', async (req, res) => {
+app.post("/api/admin/bulk-upload-whitelist", async (req, res) => {
   const { records } = req.body;
   if (!records || !Array.isArray(records)) {
-    return res.status(400).json({ error: 'Records array is required.' });
+    return res.status(400).json({ error: "Records array is required." });
   }
 
   try {
     const adminClient = getAdminClient();
-    
+
     const [profilesRes, whitelistRes] = await Promise.all([
-      adminClient.from('student_profiles').select('email'),
-      adminClient.from('student_whitelist').select('email')
+      adminClient.from("student_profiles").select("email"),
+      adminClient.from("student_whitelist").select("email"),
     ]);
 
     const existingEmails = new Set([
-      ...(profilesRes.data || []).map(p => p.email.toLowerCase()),
-      ...(whitelistRes.data || []).map(w => w.email.toLowerCase())
+      ...(profilesRes.data || []).map((p) => p.email.toLowerCase()),
+      ...(whitelistRes.data || []).map((w) => w.email.toLowerCase()),
     ]);
 
     const recordsToInsert = [];
@@ -421,12 +441,12 @@ app.post('/api/admin/bulk-upload-whitelist', async (req, res) => {
     for (const row of records) {
       const email = row.email?.toString().trim().toLowerCase();
       if (!email) continue;
-      
+
       if (existingEmails.has(email)) {
         skipped++;
         continue;
       }
-      
+
       recordsToInsert.push(row);
       existingEmails.add(email);
     }
@@ -438,9 +458,11 @@ app.post('/api/admin/bulk-upload-whitelist', async (req, res) => {
     let inserted = 0;
     let failed = 0;
     for (const record of recordsToInsert) {
-      const { error } = await adminClient.from('student_whitelist').insert(record);
+      const { error } = await adminClient
+        .from("student_whitelist")
+        .insert(record);
       if (error) {
-        console.error('Failed to insert record:', record.email, error);
+        console.error("Failed to insert record:", record.email, error);
         failed++;
       } else {
         inserted++;
@@ -449,256 +471,315 @@ app.post('/api/admin/bulk-upload-whitelist', async (req, res) => {
 
     return res.json({ success: true, inserted, skipped, failed });
   } catch (err) {
-    console.error('Bulk upload error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to bulk upload.' });
+    console.error("Bulk upload error:", err);
+    return res
+      .status(500)
+      .json({ error: err.message || "Failed to bulk upload." });
   }
 });
 
 // 6. Get Company Data
-app.get('/api/company/:companyId', authMiddleware, requireCompanyRole, async (req, res) => {
-  const { companyId } = req.params;
-  
-  try {
-    const client = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
-    });
-    
-    const { data: company } = await client
-      .from('companies')
-      .select('*')
-      .eq('id', companyId)
-      .maybeSingle();
+app.get(
+  "/api/company/:companyId",
+  authMiddleware,
+  requireCompanyRole,
+  async (req, res) => {
+    const { companyId } = req.params;
 
-    if (!company) {
-      return res.status(404).json({ error: 'Company not found' });
+    try {
+      const client = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+      });
+
+      const { data: company } = await client
+        .from("companies")
+        .select("*")
+        .eq("id", companyId)
+        .maybeSingle();
+
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      if (company.owner_user_id !== req.user.id) {
+        return res
+          .status(403)
+          .json({ error: "You do not have access to this company" });
+      }
+
+      return res.json(company);
+    } catch (err) {
+      console.error("Get company error:", err);
+      return res.status(500).json({ error: "Failed to fetch company data" });
     }
-
-    if (company.owner_user_id !== req.user.id) {
-      return res.status(403).json({ error: 'You do not have access to this company' });
-    }
-
-    return res.json(company);
-  } catch (err) {
-    console.error('Get company error:', err);
-    return res.status(500).json({ error: 'Failed to fetch company data' });
-  }
-});
+  },
+);
 
 // 7. Get Company Job Posts
-app.get('/api/company/:companyId/posts', authMiddleware, requireCompanyRole, async (req, res) => {
-  const { companyId } = req.params;
-  
-  try {
-    const client = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
-    });
-    
-    const { data: company } = await client
-      .from('companies')
-      .select('owner_user_id')
-      .eq('id', companyId)
-      .maybeSingle();
+app.get(
+  "/api/company/:companyId/posts",
+  authMiddleware,
+  requireCompanyRole,
+  async (req, res) => {
+    const { companyId } = req.params;
 
-    if (!company || company.owner_user_id !== req.user.id) {
-      return res.status(403).json({ error: 'You do not have access to this company' });
+    try {
+      const client = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+      });
+
+      const { data: company } = await client
+        .from("companies")
+        .select("owner_user_id")
+        .eq("id", companyId)
+        .maybeSingle();
+
+      if (!company || company.owner_user_id !== req.user.id) {
+        return res
+          .status(403)
+          .json({ error: "You do not have access to this company" });
+      }
+
+      const { data: posts } = await client
+        .from("job_posts")
+        .select("*")
+        .eq("company_id", companyId);
+
+      return res.json(posts || []);
+    } catch (err) {
+      console.error("Get company posts error:", err);
+      return res.status(500).json({ error: "Failed to fetch job posts" });
     }
-
-    const { data: posts } = await client
-      .from('job_posts')
-      .select('*')
-      .eq('company_id', companyId);
-
-    return res.json(posts || []);
-  } catch (err) {
-    console.error('Get company posts error:', err);
-    return res.status(500).json({ error: 'Failed to fetch job posts' });
-  }
-});
+  },
+);
 
 // 8. Update Job Post
-app.put('/api/job-posts/:postId', authMiddleware, requireCompanyRole, async (req, res) => {
-  const { postId } = req.params;
-  const { title, description, location, deadline, type } = req.body;
-  
-  try {
-    const client = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
-    });
-    
-    const { data: post } = await client
-      .from('job_posts')
-      .select('company:companies(owner_user_id)')
-      .eq('id', postId)
-      .maybeSingle();
+app.put(
+  "/api/job-posts/:postId",
+  authMiddleware,
+  requireCompanyRole,
+  async (req, res) => {
+    const { postId } = req.params;
+    const { title, description, location, deadline, type } = req.body;
 
-    if (!post || post.company.owner_user_id !== req.user.id) {
-      return res.status(403).json({ error: 'You do not have permission to edit this job post' });
+    try {
+      const client = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+      });
+
+      const { data: post } = await client
+        .from("job_posts")
+        .select("company:companies(owner_user_id)")
+        .eq("id", postId)
+        .maybeSingle();
+
+      if (!post || post.company.owner_user_id !== req.user.id) {
+        return res
+          .status(403)
+          .json({ error: "You do not have permission to edit this job post" });
+      }
+
+      const { error: updateError } = await client
+        .from("job_posts")
+        .update({ title, description, location, deadline, type })
+        .eq("id", postId);
+
+      if (updateError) throw updateError;
+
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("Update job post error:", err);
+      return res
+        .status(500)
+        .json({ error: err.message || "Failed to update job post" });
     }
-
-    const { error: updateError } = await client
-      .from('job_posts')
-      .update({ title, description, location, deadline, type })
-      .eq('id', postId);
-
-    if (updateError) throw updateError;
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('Update job post error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to update job post' });
-  }
-});
+  },
+);
 
 // 9. Delete Job Post
-app.delete('/api/job-posts/:postId', authMiddleware, requireCompanyRole, async (req, res) => {
-  const { postId } = req.params;
-  
-  try {
-    const client = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
-    });
-    
-    const { data: post } = await client
-      .from('job_posts')
-      .select('company:companies(owner_user_id)')
-      .eq('id', postId)
-      .maybeSingle();
+app.delete(
+  "/api/job-posts/:postId",
+  authMiddleware,
+  requireCompanyRole,
+  async (req, res) => {
+    const { postId } = req.params;
 
-    if (!post || post.company.owner_user_id !== req.user.id) {
-      return res.status(403).json({ error: 'You do not have permission to delete this job post' });
+    try {
+      const client = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+      });
+
+      const { data: post } = await client
+        .from("job_posts")
+        .select("company:companies(owner_user_id)")
+        .eq("id", postId)
+        .maybeSingle();
+
+      if (!post || post.company.owner_user_id !== req.user.id) {
+        return res.status(403).json({
+          error: "You do not have permission to delete this job post",
+        });
+      }
+
+      const { error: deleteError } = await client
+        .from("job_posts")
+        .delete()
+        .eq("id", postId);
+
+      if (deleteError) throw deleteError;
+
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("Delete job post error:", err);
+      return res
+        .status(500)
+        .json({ error: err.message || "Failed to delete job post" });
     }
-
-    const { error: deleteError } = await client
-      .from('job_posts')
-      .delete()
-      .eq('id', postId);
-
-    if (deleteError) throw deleteError;
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('Delete job post error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to delete job post' });
-  }
-});
+  },
+);
 
 // 10. Get Student Profile
-app.get('/api/student/profile', authMiddleware, requireStudentRole, async (req, res) => {
-  try {
-    const client = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
-    });
-    
-    const { data: profile } = await client
-      .from('student_profiles')
-      .select('*')
-      .eq('user_id', req.user.id)
-      .maybeSingle();
+app.get(
+  "/api/student/profile",
+  authMiddleware,
+  requireStudentRole,
+  async (req, res) => {
+    try {
+      const client = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+      });
 
-    if (!profile) {
-      return res.status(404).json({ error: 'Student profile not found' });
+      const { data: profile } = await client
+        .from("student_profiles")
+        .select("*")
+        .eq("user_id", req.user.id)
+        .maybeSingle();
+
+      if (!profile) {
+        return res.status(404).json({ error: "Student profile not found" });
+      }
+
+      return res.json(profile);
+    } catch (err) {
+      console.error("Get student profile error:", err);
+      return res.status(500).json({ error: "Failed to fetch profile" });
     }
-
-    return res.json(profile);
-  } catch (err) {
-    console.error('Get student profile error:', err);
-    return res.status(500).json({ error: 'Failed to fetch profile' });
-  }
-});
+  },
+);
 
 // 11. Update Student Profile
-app.put('/api/student/profile', authMiddleware, requireStudentRole, async (req, res) => {
-  const { name, location, skills, bio, achievements, extracurriculars } = req.body;
-  
-  try {
-    const client = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
-    });
-    
-    const { data: profile } = await client
-      .from('student_profiles')
-      .select('user_id')
-      .eq('user_id', req.user.id)
-      .maybeSingle();
+app.put(
+  "/api/student/profile",
+  authMiddleware,
+  requireStudentRole,
+  async (req, res) => {
+    const { name, location, skills, bio, achievements, extracurriculars } =
+      req.body;
 
-    if (!profile) {
-      return res.status(404).json({ error: 'Student profile not found' });
+    try {
+      const client = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+      });
+
+      const { data: profile } = await client
+        .from("student_profiles")
+        .select("user_id")
+        .eq("user_id", req.user.id)
+        .maybeSingle();
+
+      if (!profile) {
+        return res.status(404).json({ error: "Student profile not found" });
+      }
+
+      const { error: updateError } = await client
+        .from("student_profiles")
+        .update({ name, location, skills, bio, achievements, extracurriculars })
+        .eq("user_id", req.user.id);
+
+      if (updateError) throw updateError;
+
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("Update student profile error:", err);
+      return res
+        .status(500)
+        .json({ error: err.message || "Failed to update profile" });
     }
-
-    const { error: updateError } = await client
-      .from('student_profiles')
-      .update({ name, location, skills, bio, achievements, extracurriculars })
-      .eq('user_id', req.user.id);
-
-    if (updateError) throw updateError;
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('Update student profile error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to update profile' });
-  }
-});
+  },
+);
 
 // 12. Get Student Applications
-app.get('/api/student/applications', authMiddleware, requireStudentRole, async (req, res) => {
-  try {
-    const client = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
-    });
-    
-    const { data: applications } = await client
-      .from('applications')
-      .select('*')
-      .eq('student_id', req.user.id);
+app.get(
+  "/api/student/applications",
+  authMiddleware,
+  requireStudentRole,
+  async (req, res) => {
+    try {
+      const client = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+      });
 
-    return res.json(applications || []);
-  } catch (err) {
-    console.error('Get student applications error:', err);
-    return res.status(500).json({ error: 'Failed to fetch applications' });
-  }
-});
+      const { data: applications } = await client
+        .from("applications")
+        .select("*")
+        .eq("student_id", req.user.id);
+
+      return res.json(applications || []);
+    } catch (err) {
+      console.error("Get student applications error:", err);
+      return res.status(500).json({ error: "Failed to fetch applications" });
+    }
+  },
+);
 
 // 13. Submit Application
-app.post('/api/student/applications', authMiddleware, requireStudentRole, async (req, res) => {
-  const { postId, coverNote } = req.body;
-  
-  if (!postId) {
-    return res.status(400).json({ error: 'Post ID is required' });
-  }
-  
-  try {
-    const client = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
-    });
-    
-    const { data: existingApp } = await client
-      .from('applications')
-      .select('id')
-      .eq('student_id', req.user.id)
-      .eq('post_id', postId)
-      .maybeSingle();
+app.post(
+  "/api/student/applications",
+  authMiddleware,
+  requireStudentRole,
+  async (req, res) => {
+    const { postId, coverNote } = req.body;
 
-    if (existingApp) {
-      return res.status(400).json({ error: 'You have already applied for this position' });
+    if (!postId) {
+      return res.status(400).json({ error: "Post ID is required" });
     }
 
-    const { error: insertError } = await client
-      .from('applications')
-      .insert({
+    try {
+      const client = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+      });
+
+      const { data: existingApp } = await client
+        .from("applications")
+        .select("id")
+        .eq("student_id", req.user.id)
+        .eq("post_id", postId)
+        .maybeSingle();
+
+      if (existingApp) {
+        return res
+          .status(400)
+          .json({ error: "You have already applied for this position" });
+      }
+
+      const { error: insertError } = await client.from("applications").insert({
         post_id: postId,
         student_id: req.user.id,
         cover_note: coverNote,
-        status: 'applied'
+        status: "applied",
       });
 
-    if (insertError) throw insertError;
+      if (insertError) throw insertError;
 
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('Submit application error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to submit application' });
-  }
-});
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("Submit application error:", err);
+      return res
+        .status(500)
+        .json({ error: err.message || "Failed to submit application" });
+    }
+  },
+);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
