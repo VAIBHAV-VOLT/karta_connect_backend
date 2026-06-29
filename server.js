@@ -13,6 +13,10 @@ const { createClient } = require("@supabase/supabase-js");
 // Load environment variables from current directory
 require("dotenv").config();
 
+if (process.env.NODE_ENV === "development") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
