@@ -966,6 +966,50 @@ app.get('/api/student/recommendations', authMiddleware, requireStudentRole, asyn
   }
 });
 
+// AI Chat Widget
+app.post("/api/ai/chat", async (req, res) => {
+  try {
+    const { message, history = [] } = req.body;
+    
+    if (!ai) {
+      return res.status(500).json({ error: "Gemini API key is not configured" });
+    }
+
+    let contents = [];
+    
+    // Add conversation history
+    for (const msg of history) {
+      if (msg.role && msg.text) {
+        contents.push({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        });
+      }
+    }
+    
+    // Gemini requires the first message in contents to be from 'user'
+    // Ensure we start with a user message by stripping leading model messages
+    while (contents.length > 0 && contents[0].role === 'model') {
+      contents.shift();
+    }
+    
+    contents.push({ role: 'user', parts: [{ text: message }] });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: contents,
+      config: {
+        systemInstruction: "You are a helpful, conversational AI assistant. Provide natural, concise, and helpful responses similar to ChatGPT. Use markdown where appropriate.",
+      }
+    });
+
+    return res.json({ reply: response.text });
+  } catch (err) {
+    console.error("AI chat error:", err);
+    return res.status(500).json({ error: "Failed to process chat message" });
+  }
+});
+
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({ status: "ok", time: new Date() });
