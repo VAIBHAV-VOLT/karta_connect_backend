@@ -7,6 +7,7 @@ globalThis.WebSocket = ws;
 
 const pdfParse = require('pdf-parse');
 const { GoogleGenAI } = require('@google/genai');
+const Groq = require("groq-sdk");
 
 const { createClient } = require("@supabase/supabase-js");
 
@@ -65,6 +66,8 @@ const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_S
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const geminiApiKey = process.env.GEMINI_API_KEY || "";
 const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
+const groqApiKey = process.env.GROQ_API_KEY || "";
+const groq = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
   console.error(
@@ -971,39 +974,43 @@ app.post("/api/ai/chat", async (req, res) => {
   try {
     const { message, history = [] } = req.body;
     
-    if (!ai) {
-      return res.status(500).json({ error: "Gemini API key is not configured" });
+    if (!groq) {
+      return res.status(500).json({ error: "Groq API key is not configured" });
     }
 
-    let contents = [];
+    const messages = [
+      { role: "system", content: "You are a helpful, conversational AI assistant. Provide natural, concise, and helpful responses similar to ChatGPT. Use markdown where appropriate." }
+    ];
     
-    // Add conversation history
     for (const msg of history) {
       if (msg.role && msg.text) {
-        contents.push({
-          role: msg.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.text }]
+        messages.push({
+          role: msg.role === 'model' ? 'assistant' : 'user',
+          content: msg.text
         });
       }
     }
     
-    // Gemini requires the first message in contents to be from 'user'
-    // Ensure we start with a user message by stripping leading model messages
-    while (contents.length > 0 && contents[0].role === 'model') {
-      contents.shift();
-    }
-    
-    contents.push({ role: 'user', parts: [{ text: message }] });
+    messages.push({ role: 'user', content: message });
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: contents,
-      config: {
-        systemInstruction: "You are a helpful, conversational AI assistant. Provide natural, concise, and helpful responses similar to ChatGPT. Use markdown where appropriate.",
-      }
+    const completion = await groq.chat.completions.create({
+      model: "qwen/qwen3.6-27b",
+      messages: messages,
     });
 
-    return res.json({ reply: response.text });
+    let fullReply = completion.choices[0].message.content || "";
+    
+    // Extract and log thinking process
+    const thinkMatch = fullReply.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
+    if (thinkMatch) {
+      console.log("--- AI Thinking Process ---");
+      console.log(thinkMatch[1].trim());
+      console.log("---------------------------");
+      // Remove the think block from the reply sent to the user
+      fullReply = fullReply.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim();
+    }
+
+    return res.json({ reply: fullReply });
   } catch (err) {
     console.error("AI chat error:", err);
     return res.status(500).json({ error: "Failed to process chat message" });
